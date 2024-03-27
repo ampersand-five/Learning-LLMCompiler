@@ -1,33 +1,42 @@
 import os
 from langchain_openai import ChatOpenAI
-from langchain.agents import Tool
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.chains import LLMMathChain
 
+import os
+import getpass
 
-os.environ.get("TAVILY_API_KEY")
 
-# Math tool
-llm_math_chain = LLMMathChain.from_llm(
-  llm=ChatOpenAI(model="gpt-4-turbo-preview"),
-)
+def _get_pass(var: str):
+    if var not in os.environ:
+        os.environ[var] = getpass.getpass(f"{var}: ")
 
-math_tool = Tool(
-  name='Math',
-  description='Math tool.',
-  func=llm_math_chain.run
-)
 
+# Optional: Debug + trace calls using LangSmith
+# os.environ["LANGCHAIN_TRACING_V2"] = "True"
+# os.environ["LANGCHAIN_PROJECT"] = "LLMCompiler"
+# _get_pass("LANGCHAIN_API_KEY")
+_get_pass("OPENAI_API_KEY")
+
+from langchain_openai import ChatOpenAI
+from langchain_community.tools.tavily_search import TavilySearchResults
+
+from math_tools import get_math_tool
+
+_get_pass("TAVILY_API_KEY")
+
+calculate = get_math_tool(ChatOpenAI(model="gpt-4-turbo-preview"))
 search = TavilySearchResults(
     max_results=1,
     description='tavily_search_results_json(query="the search query") - a search engine.',
 )
 
-tools = [search, math_tool]
+tools = [search, calculate]
 
-# math_tool.invoke(
-#     {
-#         "problem": "What's the temp of sf + 5?",
-#         "context": ["Thet empreature of sf is 32 degrees"],
-#     }
-# )
+# Test the math tool
+calculate.invoke(
+    {
+        "problem": "What's the temp of sf + 5?",
+        "context": ["Thet empreature of sf is 32 degrees"],
+    }
+)
