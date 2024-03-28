@@ -5,6 +5,7 @@ from typing import (
   List,
   Dict
 )
+import itertools
 from typing_extensions import TypedDict
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -13,7 +14,7 @@ from langchain_core.messages import BaseMessage, FunctionMessage
 from langchain_core.runnables import chain as as_runnable
 
 from utils.output_parser import Task
-
+from planner import planner
 
 def _get_observations(messages: List[BaseMessage]) -> Dict[int, Any]:
     # Get all previous tool responses
@@ -153,11 +154,6 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
         for k, (name, obs) in new_observations.items()
     ]
     return tool_messages
-
-
-import itertools
-
-from planner import planner
 
 @as_runnable
 def plan_and_schedule(messages: List[BaseMessage], config):

@@ -3,7 +3,10 @@ from typing import Dict, List
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 from task_fetching_unit import plan_and_schedule
 from joiner import joiner
+from langchain.globals import set_verbose, set_debug
 
+set_verbose(True)
+# set_debug(True)
 
 workflow = MessageGraph()
 
