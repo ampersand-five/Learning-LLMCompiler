@@ -1,6 +1,6 @@
 from langgraph.graph import MessageGraph, END
 from typing import Dict, List
-from langchain_core.messages import BaseMessage, AIMessage
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 from task_fetching_unit import plan_and_schedule
 from joiner import joiner
 
@@ -56,9 +56,11 @@ chain = workflow.compile()
 
 # Example Usage
 
-
 # # *** Example 1 - Simple Question
-# for step in chain.stream([HumanMessage(content="What's the GDP of New York?")]):
+# for step in chain.stream(
+#     [HumanMessage(content="What's the GDP of New York?")],
+#     {"recursion_limit": 40}
+# ):
 #     print(step)
 #     print("---")
 
@@ -79,7 +81,7 @@ chain = workflow.compile()
 # print(step[END][-1].content)
 
 
-# *** Example 3 - Multi-Step Math Question
+# # *** Example 3 - Multi-Step Math Question
 # for step in chain.stream(
 #     [HumanMessage(content="What's ((3*(4+5)/0.5)+3245) + 8? What's 32/4.23? What's the sum of those two values?")]
 # ):
