@@ -12,6 +12,73 @@ from langchain_openai import ChatOpenAI
 from utils.tools import tools
 
 
+def create_planner(
+    llm: BaseChatModel,
+    tools: Sequence[BaseTool],
+    base_prompt: ChatPromptTemplate
+):
+    '''This function creates a planner'''
+
+    # Create a string of the tools and their descriptions
+    tool_descriptions = "\n".join(
+        f"{i}. {tool.description}\n"
+        for i, tool in enumerate(tools)
+    )
+
+    # Create the general planner prompt that doesn't have the replan instructions inserted
+    # Take the base prompt and add the number of tools and their descriptions
+    planner_prompt = base_prompt.partial(
+        replan="",
+        num_tools=len(tools),
+        tool_descriptions=tool_descriptions,
+    )
+
+    # Create the replanner prompt that has the replan instructions inserted
+    # Take the base prompt and add the number of tools and their descriptions and the replan instructions
+    replanner_prompt = base_prompt.partial(
+        replan=' - You are given "Previous Plan" which is the plan that the previous agent created along with the execution results '
+        "(given as Observation) of each plan and a general thought (given as Thought) about the executed results."
+        'You MUST use these information to create the next plan under "Current Plan".\n'
+        ' - When starting the Current Plan, you should start with "Thought" that outlines the strategy for the next plan.\n'
+        " - In the Current Plan, you should NEVER repeat the actions that are already executed in the Previous Plan.\n"
+        " - You must continue the task index from the end of the previous one. Do not repeat task indices.",
+        num_tools=len(tools),
+        tool_descriptions=tool_descriptions,
+    )
+
+    # Determine if the planner should replan - checks if the last message is a system message
+    def should_replan(state: list):
+        # Context is passed as a system message
+        return isinstance(state[-1], SystemMessage)
+
+    # Wrap the messages in a dictionary for state passing
+    def wrap_messages(state: list):
+        return {"messages": state}
+
+    def wrap_and_get_last_index(state: list):
+        next_task = 0
+        # state[::-1] means start at the end of the sequence and step backwards until you reach the start.
+        # This effectively reverses the sequence.
+        for message in state[::-1]:
+            if isinstance(message, FunctionMessage):
+                next_task = message.additional_kwargs["idx"] + 1
+                break
+        state[-1].content = state[-1].content + f" - Begin counting at : {next_task}"
+        return {"messages": state}
+
+    return (
+        RunnableBranch(
+            (should_replan, wrap_and_get_last_index | replanner_prompt),
+            wrap_messages | planner_prompt,
+        )
+        | llm
+        | LLMCompilerPlanParser(tools=tools)
+    )
+
+
+# Example
+llm = ChatOpenAI(model="gpt-4-turbo-preview")
+
 prompt = hub.pull("wfh/llm-compiler")
 '''
 The prompt pulled from the hub creates a is actually a three prompt list (ChatPromptTemplate object):
@@ -49,60 +116,9 @@ The prompt pulled from the hub creates a is actually a three prompt list (ChatPr
 """Remember, ONLY respond with the task list in the correct format! E.g.:
 idx. tool(arg_name=args)"""
 '''
+
 print('Planner prompt (ChatPromptTemplate object):\n', prompt)
 
-def create_planner(
-    llm: BaseChatModel,
-    tools: Sequence[BaseTool],
-    base_prompt: ChatPromptTemplate
-):
-    tool_descriptions = "\n".join(
-        f"{i}. {tool.description}\n" for i, tool in enumerate(tools)
-    )
-    planner_prompt = base_prompt.partial(
-        replan="",
-        num_tools=len(tools),
-        tool_descriptions=tool_descriptions,
-    )
-    replanner_prompt = base_prompt.partial(
-        replan=' - You are given "Previous Plan" which is the plan that the previous agent created along with the execution results '
-        "(given as Observation) of each plan and a general thought (given as Thought) about the executed results."
-        'You MUST use these information to create the next plan under "Current Plan".\n'
-        ' - When starting the Current Plan, you should start with "Thought" that outlines the strategy for the next plan.\n'
-        " - In the Current Plan, you should NEVER repeat the actions that are already executed in the Previous Plan.\n"
-        " - You must continue the task index from the end of the previous one. Do not repeat task indices.",
-        num_tools=len(tools),
-        tool_descriptions=tool_descriptions,
-    )
-
-    def should_replan(state: list):
-        # Context is passed as a system message
-        return isinstance(state[-1], SystemMessage)
-
-    def wrap_messages(state: list):
-        return {"messages": state}
-
-    def wrap_and_get_last_index(state: list):
-        next_task = 0
-        for message in state[::-1]:
-            if isinstance(message, FunctionMessage):
-                next_task = message.additional_kwargs["idx"] + 1
-                break
-        state[-1].content = state[-1].content + f" - Begin counting at : {next_task}"
-        return {"messages": state}
-
-    return (
-        RunnableBranch(
-            (should_replan, wrap_and_get_last_index | replanner_prompt),
-            wrap_messages | planner_prompt,
-        )
-        | llm
-        | LLMCompilerPlanParser(tools=tools)
-    )
-
-
-# Example
-llm = ChatOpenAI(model="gpt-4-turbo-preview")
 # This is the primary "agent" in our application
 planner = create_planner(llm, tools, prompt)
 
