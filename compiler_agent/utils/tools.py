@@ -20,7 +20,7 @@ _get_pass("OPENAI_API_KEY")
 from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search import TavilySearchResults
 
-from math_tools import get_math_tool
+from utils.math_tools import get_math_tool
 
 _get_pass("TAVILY_API_KEY")
 

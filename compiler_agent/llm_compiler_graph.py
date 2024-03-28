@@ -56,16 +56,16 @@ chain = workflow.compile()
 
 # Example Usage
 
-# # *** Example 1 - Simple Question
-# for step in chain.stream(
-#     [HumanMessage(content="What's the GDP of New York?")],
-#     {"recursion_limit": 40}
-# ):
-#     print(step)
-#     print("---")
+# *** Example 1 - Simple Question
+for step in chain.stream(
+    [HumanMessage(content="What's the GDP of New York?")],
+    {"recursion_limit": 40}
+):
+    print(step)
+    print("---")
 
-# # Final answer
-# print(step[END][-1].content)
+# Final answer
+print(step[END][-1].content)
 
 
 # # *** Example 2 - Multi-Hop Question
