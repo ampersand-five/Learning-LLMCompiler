@@ -11,6 +11,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import StructuredTool
 
+
 _MATH_DESCRIPTION = (
     "math(problem: str, context: Optional[list[str]]) -> float:\n"
     " - Solves the provided math problem.\n"
@@ -33,7 +34,6 @@ _MATH_DESCRIPTION = (
     " - When you ask a question about `context`, specify the units. "
     'For instance, "what is xx in height?" or "what is xx in millions?" instead of "what is xx?"\n'
 )
-
 
 _SYSTEM_PROMPT = """Translate a math problem into a expression that can be executed using Python's numexpr library. Use the output of running this code to answer the question.
 

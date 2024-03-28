@@ -8,7 +8,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    Union,
+    Union
 )
 
 from langchain_core.exceptions import OutputParserException
@@ -26,7 +26,6 @@ END_OF_PLAN = "<END_OF_PLAN>"
 
 
 ### Helper functions
-
 
 def _ast_parse(arg: str) -> Any:
     try:
