@@ -36,10 +36,10 @@ def create_planner(
     # Create the replanner prompt that has the replan instructions inserted
     # Take the base prompt and add the number of tools and their descriptions and the replan instructions
     replanner_prompt = base_prompt.partial(
-        replan=' - You are given "Previous Plan" which is the plan that the previous agent created along with the execution results '
-        "(given as Observation) of each plan and a general thought (given as Thought) about the executed results."
-        'You MUST use these information to create the next plan under "Current Plan".\n'
-        ' - When starting the Current Plan, you should start with "Thought" that outlines the strategy for the next plan.\n'
+        replan=" - You are given \"Previous Plan\" which is the plan that the previous agent created along with the execution results "
+        "(given as Observation) of each plan and a general thought (given as Thought) about the executed results. "
+        "You MUST use these information to create the next plan under \"Current Plan\".\n"
+        " - When starting the Current Plan, you should start with \"Thought\" that outlines the strategy for the next plan.\n"
         " - In the Current Plan, you should NEVER repeat the actions that are already executed in the Previous Plan.\n"
         " - You must continue the task index from the end of the previous one. Do not repeat task indices.",
         num_tools=len(tools),
@@ -60,6 +60,8 @@ def create_planner(
         # state[::-1] means start at the end of the sequence and step backwards until you reach the start.
         # This effectively reverses the sequence.
         for message in state[::-1]:
+            # Look for the last (or you could say most recent) tool result (FunctionMessages are results from function
+            # calls that are passed back) and get the index for right after it
             if isinstance(message, FunctionMessage):
                 next_task = message.additional_kwargs["idx"] + 1
                 break
