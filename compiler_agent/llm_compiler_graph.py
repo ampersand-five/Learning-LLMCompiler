@@ -29,6 +29,23 @@ workflow.add_edge(start_key="plan_and_schedule", end_key="joiner")
 
 # This condition determines looping logic
 def should_continue(state: List[BaseMessage]):
+    '''Example State with SystemMessage, i.e. means we replan:
+- HumanMessage(content="What's the GDP of New York?")
+- FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
+- AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
+- SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure. - Begin counting at : 1')
+- AIMessage(content="Thought: The search result provides a link to a potentially relevant source but does not directly answer the user's question with a specific GDP value for New York. To provide a direct answer, more specific data or a summary of the content from the provided URL is required.")
+- SystemMessage(content="Context from last attempt: To answer the user's question, we need the specific GDP value for New York, NY (MSA). A direct extraction of this value from the provided URL or a summary of its content would be necessary. The current result only indicates the availability of such data without specifying it.")
+
+Example State with AIMessage, i.e. means we finish:
+- HumanMessage(content="What's the GDP of New York?")
+- FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
+- AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
+- SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure. - Begin counting at : 1')
+- AIMessage(content="Thought: The search result provides a link to a potentially relevant source but does not directly answer the user's question with a specific GDP value for New York. To provide a direct answer, more specific data or a summary of the content from the provided URL is required.")
+- SystemMessage(content="Context from last attempt: To answer the user's question, we need the specific GDP value for New York, NY (MSA). A direct extraction of this value from the provided URL or a summary of its content would be necessary. The current result only indicates the availability of such data without specifying it.")
+- AIMessage(content="I'm unable to find the exact GDP value for New York from the provided sources. The information mentions the real GDP of New York from 2017 to 2022 but does not specify the numbers. For the most accurate and up-to-date figures, I recommend checking official economic reports or databases such as the U.S. Bureau of Economic Analysis or Statista directly.")
+    '''
     if isinstance(state[-1], AIMessage):
         return END
     return "plan_and_schedule"

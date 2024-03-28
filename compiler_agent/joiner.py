@@ -91,10 +91,12 @@ def _parse_joiner_output(decision: JoinOutputs) -> List[BaseMessage]:
 
 def select_recent_messages(messages: list) -> dict:
     selected = []
+    # Reverse the list
     for msg in messages[::-1]:
         selected.append(msg)
         if isinstance(msg, HumanMessage):
             break
+    # Return reversed list
     return {"messages": selected[::-1]}
 
 

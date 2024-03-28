@@ -46,7 +46,21 @@ def create_planner(
         tool_descriptions=tool_descriptions,
     )
 
-    # Determine if the planner should replan - checks if the last message is a system message
+    # Determine if the planner should replan - checks if the last message is a system
+    # message. This means that the agent tried to answer the question but ended up with
+    # no results and has context from the last attempt in a system message for how
+    # to proceed.
+    '''Example State 1 on first pass, normal planning, not replanning:
+- HumanMessage(content="What's the GDP of New York?")
+
+Example State 2 on second pass after the first attempt didn't provide the answer, replan:
+- HumanMessage(content="What's the GDP of New York?")
+- FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
+- AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
+- SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure. - Begin counting at : 1')
+- AIMessage(content="Thought: The search result provides a link to a potentially relevant source but does not directly answer the user's question with a specific GDP value for New York. To provide a direct answer, more specific data or a summary of the content from the provided URL is required.")
+- SystemMessage(content="Context from last attempt: To answer the user's question, we need the specific GDP value for New York, NY (MSA). A direct extraction of this value from the provided URL or a summary of its content would be necessary. The current result only indicates the availability of such data without specifying it.")
+    '''
     def should_replan(state: list):
         # Context is passed as a system message
         return isinstance(state[-1], SystemMessage)
@@ -57,20 +71,54 @@ def create_planner(
 
     def wrap_and_get_last_index(state: list):
         next_task = 0
-        # state[::-1] means start at the end of the sequence and step backwards until you reach the start.
-        # This effectively reverses the sequence.
+        # Look for the last (or you could say most recent) tool result (FunctionMessages
+        # are results from function calls that are passed back) and get the index.
+        # Note: state[::-1] means start at the end of the sequence and step backwards
+        # until you reach the start. This effectively reverses the sequence.
         for message in state[::-1]:
-            # Look for the last (or you could say most recent) tool result (FunctionMessages are results from function
-            # calls that are passed back) and get the index for right after it
             if isinstance(message, FunctionMessage):
+                # +1 because we will pass this 
                 next_task = message.additional_kwargs["idx"] + 1
                 break
+        # Example to illustrate
+        '''
+State:
+- HumanMessage(content="What's the GDP of New York?")
+- FunctionMessage(content="[{'url': 'https://fed.newyork.org/series/R', 'content': 'Graph and download
+economic data for Total Real Gross Domestic Product for NY (R) from 2017 to 2022 about New York, NY,\\xa0...'}]",
+additional_kwargs={'idx': 0}, name='tavily_search_results_json')
+- AIMessage(content="Thought: The search result provides a URL to a page on the NY Federal Reserve's website that
+likely contains the information on NY's GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet.
+Without the specific GDP value, the user's question cannot be directly answered.")
+- SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP
+value for NY. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP
+figure.')
+
+In this case, the last FunctionMessage has an idx of 0, so next_task will be set as 1.
+The last message, that's being accessed in the line below, will change to:
+- SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP
+value for NY. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP
+figure. - Begin counting at : 1')
+        '''
         state[-1].content = state[-1].content + f" - Begin counting at : {next_task}"
         return {"messages": state}
 
     return (
+        # Branching logic that determines which prompt we use: planner or replanner.
+        # Each branch is a tuple of (condition, action). The first condition that
+        # returns True will be the branch that is executed. The final branch is not a
+        # tuple, and is the default action to take if none of the conditions return
+        # True.
         RunnableBranch(
+            # How to read this: should_replan, (wrap_and_get_last_index | replanner_prompt)
+            # Call should_replan(), if it returns True, then call
+            # wrap_and_get_last_index() and use the output to map to the
+            # replanner_prompt. The | character is a special LangChain LCEL operator
+            # that connects actions.
             (should_replan, wrap_and_get_last_index | replanner_prompt),
+            # Default action to take: (wrap_messages | planner_prompt) -> this is one
+            # action to take, even though it looks like two. The | character is a
+            # special LangChain LCEL operator that connects the two.
             wrap_messages | planner_prompt,
         )
         | llm
@@ -119,7 +167,7 @@ The prompt pulled from the hub creates a is actually a three prompt list (ChatPr
 idx. tool(arg_name=args)"""
 '''
 
-print('Planner prompt (ChatPromptTemplate object):\n', prompt)
+print('Planner prompt (ChatPromptTemplate object):\n', prompt, '\n')
 
 # This is the primary "agent" in our application
 planner = create_planner(llm, tools, prompt)
