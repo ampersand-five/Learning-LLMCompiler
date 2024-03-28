@@ -18,9 +18,6 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain.chains.openai_functions import create_structured_output_runnable
 from langchain_core.messages import AIMessage
 
-from task_fetching_unit import tool_messages
-
-
 
 class FinalResponse(BaseModel):
     """The final response/answer."""

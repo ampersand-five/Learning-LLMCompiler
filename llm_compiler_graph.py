@@ -1,6 +1,6 @@
 from langgraph.graph import MessageGraph, END
 from typing import Dict, List
-from langchain_core.messages import BaseMessage, AIMessage
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 from task_fetching_unit import plan_and_schedule
 from joiner import joiner
 
@@ -13,7 +13,6 @@ workflow = MessageGraph()
 # registers and sets them for use.
 workflow.add_node(key="plan_and_schedule", action=plan_and_schedule)
 workflow.add_node(key="joiner", action=joiner)
-
 
 # Define edges
 # Creates an edge from one node to the next. This means that output of the first node
@@ -30,13 +29,33 @@ def should_continue(state: List[BaseMessage]):
         return END
     return "plan_and_schedule"
 
-
+# This method adds conditional edges. What this means is that only one of the downstream
+# edges will be taken, and which one that is depends on the results of the start node.
+# This takes two required arguments and one optional argument:
+# - start_key: A string representing the name of the start node. This key must have
+# already been registered in the graph.
+# - condition: A function to call to decide what to do next. The input will be the
+# output of the start node. It should return a string that is present in
+# 'conditional_edge_mapping' and represents the edge to take.
+# - (optional) conditional_edge_mapping: A mapping of string to string. The keys should be strings
+# that may be returned by condition. The values should be the downstream node to call if
+# that condition is returned.
 workflow.add_conditional_edges(
     start_key="joiner",
     # Next, we pass in the function that will determine which node is called next.
-    condition=should_continue,
+    condition=should_continue
 )
 
 workflow.set_entry_point("plan_and_schedule")
 
 chain = workflow.compile()
+
+
+
+
+# Example Usage
+
+# Example 1
+for step in chain.stream([HumanMessage(content="What's the GDP of New York?")]):
+    print(step)
+    print("---")
