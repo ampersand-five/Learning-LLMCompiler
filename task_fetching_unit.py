@@ -169,7 +169,12 @@ from planner import planner
 def plan_and_schedule(messages: List[BaseMessage], config):
     tasks = planner.stream(messages, config)
     # Begin executing the planner immediately
-    tasks = itertools.chain([next(tasks)], tasks)
+    try:
+        first_task = next(tasks)
+        tasks = itertools.chain([next(first_task)], tasks)
+    except StopIteration:
+        # Handle the case where 'tasks' is empty or has reached its end
+        tasks = iter([])
     scheduled_tasks = schedule_tasks.invoke(
         {
             "messages": messages,
