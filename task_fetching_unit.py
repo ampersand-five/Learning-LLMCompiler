@@ -171,7 +171,7 @@ def plan_and_schedule(messages: List[BaseMessage], config):
     # Begin executing the planner immediately
     try:
         first_task = next(tasks)
-        tasks = itertools.chain([next(first_task)], tasks)
+        tasks = itertools.chain([first_task], tasks)
     except StopIteration:
         # Handle the case where 'tasks' is empty or has reached its end
         tasks = iter([])
