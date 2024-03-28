@@ -34,9 +34,9 @@ search = TavilySearchResults(
 tools = [search, calculate]
 
 # Test the math tool
-calculate.invoke(
-    {
-        "problem": "What's the temp of sf + 5?",
-        "context": ["Thet empreature of sf is 32 degrees"],
-    }
-)
+# calculate.invoke(
+#     {
+#         "problem": "What's the temp of sf + 5?",
+#         "context": ["Thet empreature of sf is 32 degrees"],
+#     }
+# )

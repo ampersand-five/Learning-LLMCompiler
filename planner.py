@@ -76,8 +76,9 @@ llm = ChatOpenAI(model="gpt-4-turbo-preview")
 planner = create_planner(llm, tools, prompt)
 
 
-example_question = "What's the temperature in SF raised to the 3rd power?"
+# Example usage
+# example_question = "What's the temperature in SF raised to the 3rd power?"
 
-for task in planner.stream([HumanMessage(content=example_question)]):
-    print(task["tool"], task["args"])
-    print("---")
+# for task in planner.stream([HumanMessage(content=example_question)]):
+#     print(task["tool"], task["args"])
+#     print("---")

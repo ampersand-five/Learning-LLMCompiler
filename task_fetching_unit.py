@@ -181,6 +181,6 @@ def plan_and_schedule(messages: List[BaseMessage], config):
 
 
 # Example:
-example_question = "What's the temperature in SF raised to the 3rd power?"
-tool_messages = plan_and_schedule.invoke([HumanMessage(content=example_question)])
-print(tool_messages)
+# example_question = "What's the temperature in SF raised to the 3rd power?"
+# tool_messages = plan_and_schedule.invoke([HumanMessage(content=example_question)])
+# print(tool_messages)

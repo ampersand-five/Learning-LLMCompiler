@@ -74,6 +74,6 @@ def select_recent_messages(messages: list) -> dict:
 joiner = select_recent_messages | runnable | _parse_joiner_output
 
 # Example usage
-example_question = "What's the temperature in SF raised to the 3rd power?"
-input_messages = [HumanMessage(content=example_question)] + tool_messages
-joiner.invoke(input_messages)
+# example_question = "What's the temperature in SF raised to the 3rd power?"
+# input_messages = [HumanMessage(content=example_question)] + tool_messages
+# joiner.invoke(input_messages)
