@@ -55,8 +55,33 @@ chain = workflow.compile()
 
 # Example Usage
 
-# Example 1
+
+# *** Example 1
 for step in chain.stream([HumanMessage(content="What's the GDP of New York?")]):
+    print(step)
+    print("---")
+
+# Final answer
+print(step[END][-1].content)
+
+
+# *** Example 2
+steps = chain.stream(
+    [HumanMessage(content="What's the oldest parrot alive, and how much longer is that than the average?")],
+    {"recursion_limit": 100}
+)
+for step in steps:
+    print(step)
+    print("---")
+
+# Final answer
+print(step[END][-1].content)
+
+
+# *** Example 3
+for step in chain.stream(
+    [HumanMessage(content="What's ((3*(4+5)/0.5)+3245) + 8? What's 32/4.23? What's the sum of those two values?")]
+):
     print(step)
     print("---")
 
