@@ -59,3 +59,6 @@ chain = workflow.compile()
 for step in chain.stream([HumanMessage(content="What's the GDP of New York?")]):
     print(step)
     print("---")
+
+# Final answer
+print(step[END][-1].content)
