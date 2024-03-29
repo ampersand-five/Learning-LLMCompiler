@@ -79,6 +79,22 @@ llm = ChatOpenAI(model="gpt-4-turbo-preview")
 runnable = create_structured_output_runnable(JoinOutputs, llm, joiner_prompt)
 
 def _parse_joiner_output(decision: JoinOutputs) -> List[BaseMessage]:
+  '''This function parses the LLM the output from the joiner prompt. That prompt asks
+  the LLM to proved a thought and action. The thought is if there's enough information
+  to answer the user's question. The action should be either 'Finish' or 'Replan'.
+
+  The decision object passed in has a thought and an action. This takes
+  the thought and makes an AI message from it and adds it to the response message list
+  this function returns. It also checks if the action in the 'decision' object, that is
+  passed in, is a 'Replan' action object. If it is, then a SystemMessage is created from
+  the feedback the LLM gave when it decided to use a replan object (the LLM explains why
+  it chose that, this is our feedback we set) and the SystemMessage is appended to the
+  return list.
+
+  Returns either a list that is:
+  - [AIMessage]: Indicates the action was 'Finish'.
+  - [AIMessage, SystemMessage]: Indicates the action was 'Replan'
+  '''
   response = [AIMessage(content=f"Thought: {decision.thought}")]
   if isinstance(decision.action, Replan):
     return response + [
