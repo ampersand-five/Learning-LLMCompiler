@@ -36,13 +36,17 @@ def _ast_parse(arg: str) -> Any:
 
 def _parse_llm_compiler_action_args(args: str, tool: Union[str, BaseTool]) -> list[Any]:
   """Parse arguments from a string."""
+
   if args == "":
     return ()
+
   if isinstance(tool, str):
     return ()
+
   extracted_args = {}
   tool_key = None
   prev_idx = None
+
   for key in tool.args.keys():
     # Split if present
     if f"{key}=" in args:
@@ -51,17 +55,35 @@ def _parse_llm_compiler_action_args(args: str, tool: Union[str, BaseTool]) -> li
         extracted_args[tool_key] = _ast_parse(
           args[prev_idx:idx].strip().rstrip(",")
         )
+
       args = args.split(f"{key}=", 1)[1]
       tool_key = key
       prev_idx = 0
+
   if prev_idx is not None:
     extracted_args[tool_key] = _ast_parse(
       args[prev_idx:].strip().rstrip(",").rstrip(")")
     )
+
   return extracted_args
 
 
-def default_dependency_rule(idx, args: str):
+def default_dependency_rule(idx, args: str) -> bool:
+  '''Checks to see if the given index is listed as a dependency in the args string.
+
+  Uses regex to find all instances of the ID_PATTERN in the args string. This pulls out
+  numbers taht are formatted to show dependencies.
+  Example regex matching: $1 or ${1} -> 1
+
+  Then, for all matches it finds, it checks if the index (idx) passed in is in the list.
+
+  For example, if the args string is "query=$1, $2, $3" and idx is 2, then this function
+  will return True.
+
+  Purpose is for another function to use this to find when the current index is one of
+  the dependencies so that it can be removed from a list of dependencies.
+
+  '''
   matches = re.findall(ID_PATTERN, args)
   numbers = [int(match) for match in matches]
   return idx in numbers
@@ -69,10 +91,14 @@ def default_dependency_rule(idx, args: str):
 
 def _get_dependencies_from_graph(
   idx: int, tool_name: str, args: Dict[str, Any]
-) -> dict[str, list[str]]:
-  """Get dependencies from a graph."""
+  ) -> dict[str, list[str]]:
+  '''Get dependencies from a graph.'''
+
+  # If the tool is 'join', that's a special case. It's an internal tool that was not one
+  # of the ones in the tools.py file or passed in the tools argument to the planner.
   if tool_name == "join":
-      return list(range(1, idx))
+    return list(range(1, idx))
+
   return [i for i in range(1, idx) if default_dependency_rule(i, str(args))]
 
 
@@ -90,14 +116,22 @@ def instantiate_task(
   tool_name: str,
   args: Union[str, Any],
   thought: Optional[str] = None,
-) -> Task:
+  ) -> Task:
+  """Instantiate a task."""
+  # If the tool is 'join', that's a special case. It's an internal tool that was not one
+  # of the ones in the tools.py file or passed in the tools argument to the planner.
   if tool_name == "join":
     tool = "join"
+
+  # Look for the tool in the tools list
   else:
     try:
       tool = tools[[tool.name for tool in tools].index(tool_name)]
+
     except ValueError as e:
       raise OutputParserException(f"Tool {tool_name} not found.") from e
+
+  # Parse args and dependencies
   tool_args = _parse_llm_compiler_action_args(args, tool)
   dependencies = _get_dependencies_from_graph(idx, tool_name, tool_args)
 
@@ -122,15 +156,27 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     for chunk in input:
       # Assume input is str. TODO: support vision/other formats
       text = chunk if isinstance(chunk, str) else str(chunk.content)
+      # Example partial text:
+      # - texts: ['', '0', '.', ' tav']
+      # - text: 'ily'
+      # Example complete text:
+      # - texts: ['', '0', '.', ' tav', 'ily', '_search', '_results', '_json', '(query', '="', 'G', 'DP', ' of', ' New', ' York', '")', '']
+      # - returned task: {'idx': 0, 'tool': TavilySearchResults(description='tavily_search_results_json(query="the search query") - a search engine.', max_results=1), 'args': {'query': 'GDP of New York'}, 'dependencies': [], 'thought': None}
+      # - thought (or '_' as we set it here since we're not using it): None
       for task, thought in self.ingest_token(text, texts, thought):
         yield task
     # Final possible task
     if texts:
       task, _ = self._parse_task("".join(texts), thought)
+      # Example:
+      # - texts: ['', '0', '.', ' tav', 'ily', '_search', '_results', '_json', '(query', '="', 'G', 'DP', ' of', ' New', ' York', '")', '']
+      # - returned task: {'idx': 0, 'tool': TavilySearchResults(description='tavily_search_results_json(query="the search query") - a search engine.', max_results=1), 'args': {'query': 'GDP of New York'}, 'dependencies': [], 'thought': None}
+      # - thought (or '_' as we set it here since we're not using it): None
       if task:
         yield task
 
   def parse(self, text: str) -> List[Task]:
+    ''''''
     return list(self._transform([text]))
 
   def stream(
@@ -139,11 +185,17 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     config: RunnableConfig | None = None,
     **kwargs: Any | None,
   ) -> Iterator[Task]:
+    ''''''
     yield from self.transform([input], config, **kwargs)
 
   def ingest_token(
-    self, token: str, buffer: List[str], thought: Optional[str]
+    self,
+    token: str,
+    buffer: List[str],
+    thought: Optional[str]
   ) -> Iterator[Tuple[Optional[Task], str]]:
+    '''
+    '''
     buffer.append(token)
     if "\n" in token:
       buffer_ = "".join(buffer).split("\n")
@@ -165,6 +217,9 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
       We set thought to None and return both: (task, thought).
     - If Neither (Incomplete): We return task=None, thought=thought (thought stays as
       it was when passed in as an argument to this function).
+    
+    Example line:
+    - '0. tavily_search_results_json(query="GDP of New York")'
     """
     task = None
     if match := re.match(THOUGHT_PATTERN, line):
