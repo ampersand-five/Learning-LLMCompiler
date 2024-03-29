@@ -156,6 +156,16 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
             buffer.append(suffix)
 
     def _parse_task(self, line: str, thought: Optional[str] = None):
+        """This function is used to parse streamed tokens. If what is passed in is not
+        complete then it is ignored and simply returned. If it is complete, then we
+        check if the streamed tokens were a thought or an action.
+        - If Thought: We set the 'thought' variable and keep task as None. Task can be
+          checked for None to see if it was a thought.
+        - If Task: We pull out the index, tool_name and args and instantiate a task object.
+          We set thought to None and return both: (task, thought).
+        - If Neither (Incomplete): We return task=None, thought=thought (thought stays as
+          it was when passed in as an argument to this function).
+        """
         task = None
         if match := re.match(THOUGHT_PATTERN, line):
             # Optionally, action can be preceded by a thought

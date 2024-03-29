@@ -46,22 +46,26 @@ def create_planner(
         tool_descriptions=tool_descriptions,
     )
 
-    # Determine if the planner should replan - checks if the last message is a system
-    # message. This means that the agent tried to answer the question but ended up with
-    # no results and has context from the last attempt in a system message for how
-    # to proceed.
-    '''Example State 1 on first pass, normal planning, not replanning:
+    def should_replan(state: list):
+        '''
+    Determine if the planner should replan - checks if the last message is a system
+    message. This means that the agent tried to answer the question but ended up with
+    no results and has context from the last attempt in a system message for how
+    to proceed.
+
+Example 1) On first pass, normal planning, not replanning:
+State:
 - HumanMessage(content="What's the GDP of New York?")
 
-Example State 2 on second pass after the first attempt didn't provide the answer, replan:
+Example 2) On second pass after the first attempt didn't provide the answer, replan:
+State:
 - HumanMessage(content="What's the GDP of New York?")
 - FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
 - AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
 - SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure. - Begin counting at : 1')
 - AIMessage(content="Thought: The search result provides a link to a potentially relevant source but does not directly answer the user's question with a specific GDP value for New York. To provide a direct answer, more specific data or a summary of the content from the provided URL is required.")
 - SystemMessage(content="Context from last attempt: To answer the user's question, we need the specific GDP value for New York, NY (MSA). A direct extraction of this value from the provided URL or a summary of its content would be necessary. The current result only indicates the availability of such data without specifying it.")
-    '''
-    def should_replan(state: list):
+        '''
         # Context is passed as a system message
         return isinstance(state[-1], SystemMessage)
 

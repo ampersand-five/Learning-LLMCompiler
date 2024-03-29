@@ -19,9 +19,12 @@ from utils.planner import planner
 def _get_observations(messages: List[BaseMessage]) -> Dict[int, Any]:
     # Get all previous tool responses
     results = {}
+    # Invert the list
+    # For each message, if it is a tool message, add it to the results
     for message in messages[::-1]:
         if isinstance(message, FunctionMessage):
             results[int(message.additional_kwargs["idx"])] = message.content
+    # Return all instances of tool responses.
     return results
 
 
@@ -101,15 +104,18 @@ def schedule_pending_task(
 
 @as_runnable
 def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
-    """Group the tasks into a DAG schedule."""
-    # For streaming, we are making a few simplifying assumptions:
-    # 1. The LLM does not create cyclic dependencies
-    # 2. That the LLM will not generate tasks with future deps
-    # If this ceases to be a good assumption, you can either
-    # adjust to do a proper topological sort (not-stream)
-    # or use a more complicated data structure
+    """Group the tasks into a DAG schedule.
+    For streaming, we are making a few simplifying assumptions:
+    1. The LLM does not create cyclic dependencies.
+    2. That the LLM will not generate tasks with future dependencies.
+    If this ceases to be a good assumption, you can either
+    adjust to do a proper topological sort (not-stream)
+    or use a more complicated data structure
+    """
+
     tasks = scheduler_input["tasks"]
     messages = scheduler_input["messages"]
+
     # If we are re-planning, we may have calls that depend on previous
     # plans. Start with those.
     observations = _get_observations(messages)
@@ -157,8 +163,11 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
 
 @as_runnable
 def plan_and_schedule(messages: List[BaseMessage], config):
+    # Planner returns a generator of tasks, meaning it's a lazy iterator. We will call
+    # next() on it to kickstart the first task.
     tasks = planner.stream(messages, config)
-    # Begin executing the planner immediately
+    # Get the first task which makes the lazy generator kickstart the first task, then
+    # join it back now that the first task has started.
     try:
         first_task = next(tasks)
         tasks = itertools.chain([first_task], tasks)
