@@ -34,28 +34,40 @@ class SchedulerInput(TypedDict):
 
 
 def _execute_task(task, observations, config):
+  '''Execute a task with the given observations.'''
+
   tool_to_use = task["tool"]
+
   if isinstance(tool_to_use, str):
     return tool_to_use
+
   args = task["args"]
+
   try:
+
     if isinstance(args, str):
       resolved_args = _resolve_arg(args, observations)
+
     elif isinstance(args, dict):
       resolved_args = {
         key: _resolve_arg(val, observations) for key, val in args.items()
       }
+
     else:
       # This will likely fail
       resolved_args = args
+
   except Exception as e:
     return (
       f"ERROR(Failed to call {tool_to_use.name} with args {args}.)"
       f" Args could not be resolved. Error: {repr(e)}"
     )
+
   try:
     return tool_to_use.invoke(resolved_args, config)
+
   except Exception as e:
+
     return (
       f"ERROR(Failed to call {tool_to_use.name} with args {args}."
       + f" Args resolved to {resolved_args}. Error: {repr(e)})"
@@ -63,25 +75,34 @@ def _execute_task(task, observations, config):
 
 
 def _resolve_arg(arg: Union[str, Any], observations: Dict[int, Any]):
+
   if isinstance(arg, str) and arg.startswith("$"):
+
     try:
       stripped = arg[1:].replace(".output", "").strip("{}")
       idx = int(stripped)
+
     except Exception:
       return str(arg)
+
     return str(observations[idx])
+
   elif isinstance(arg, list):
     return [_resolve_arg(a, observations) for a in arg]
+
   else:
     return str(arg)
 
 
 @as_runnable
 def schedule_task(task_inputs, config):
+
   task: Task = task_inputs["task"]
   observations: Dict[int, Any] = task_inputs["observations"]
+
   try:
     observation = _execute_task(task, observations, config)
+
   except Exception:
     import traceback
     observation = traceback.format_exception()  # repr(e) +
@@ -92,12 +113,15 @@ def schedule_task(task_inputs, config):
 def schedule_pending_task(
   task: Task, observations: Dict[int, Any], retry_after: float = 0.2
 ):
+
   while True:
     deps = task["dependencies"]
+
     if deps and (any([dep not in observations for dep in deps])):
       # Dependencies not yet satisfied
       time.sleep(retry_after)
       continue
+
     schedule_task.invoke({"task": task, "observations": observations})
     break
 
@@ -125,12 +149,14 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
   # avoid race conditions...
   futures = []
   retry_after = 0.25  # Retry every quarter second
+
   with ThreadPoolExecutor() as executor:
     for task in tasks:
       deps = task["dependencies"]
       task_names[task["idx"]] = (
         task["tool"] if isinstance(task["tool"], str) else task["tool"].name
       )
+
       if (
         # Depends on other tasks
         deps
@@ -141,39 +167,46 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
             schedule_pending_task, task, observations, retry_after
           )
         )
+
       else:
         # No deps or all deps satisfied
         # can schedule now
         schedule_task.invoke(dict(task=task, observations=observations))
-        # futures.append(executor.submit(schedule_task.invoke dict(task=task, observations=observations)))
 
     # All tasks have been submitted or enqueued
     # Wait for them to complete
     wait(futures)
+
   # Convert observations to new tool messages to add to the state
   new_observations = {
     k: (task_names[k], observations[k])
     for k in sorted(observations.keys() - originals)
   }
+
   tool_messages = [
     FunctionMessage(name=name, content=str(obs), additional_kwargs={"idx": k})
     for k, (name, obs) in new_observations.items()
   ]
+
   return tool_messages
 
 @as_runnable
 def plan_and_schedule(messages: List[BaseMessage], config):
+
   # Planner returns a generator of tasks, meaning it's a lazy iterator. We will call
   # next() on it to kickstart the first task.
   tasks = planner.stream(messages, config)
+
   # Get the first task which makes the lazy generator kickstart the first task, then
   # join it back now that the first task has started.
   try:
     first_task = next(tasks)
     tasks = itertools.chain([first_task], tasks)
+
   except StopIteration:
     # Handle the case where 'tasks' is empty or has reached its end
     tasks = iter([])
+
   scheduled_tasks = schedule_tasks.invoke(
     {
       "messages": messages,
@@ -181,6 +214,7 @@ def plan_and_schedule(messages: List[BaseMessage], config):
     },
     config,
   )
+
   return scheduled_tasks
 
 
