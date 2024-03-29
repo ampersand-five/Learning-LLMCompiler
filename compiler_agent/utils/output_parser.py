@@ -126,6 +126,9 @@ def instantiate_task(
   # Look for the tool in the tools list
   else:
     try:
+      # Get the tool names in a list. Then, get the index of the tool_name we're looking
+      # for. Finally, using the index we found, use that index to index into the tools
+      # list to get out the tool we're looking for.
       tool = tools[[tool.name for tool in tools].index(tool_name)]
 
     except ValueError as e:
@@ -163,9 +166,17 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
       # - texts: ['', '0', '.', ' tav', 'ily', '_search', '_results', '_json', '(query', '="', 'G', 'DP', ' of', ' New', ' York', '")', '']
       # - returned task: {'idx': 0, 'tool': TavilySearchResults(description='tavily_search_results_json(query="the search query") - a search engine.', max_results=1), 'args': {'query': 'GDP of New York'}, 'dependencies': [], 'thought': None}
       # - thought (or '_' as we set it here since we're not using it): None
-      for task, thought in self.ingest_token(text, texts, thought):
+      # Notes:
+      # - ingest_token calls _parse_task internally
+
+      # ingest_token will generally just buffer and return, but if there's a newline,
+      # it will check if the current buffer is a task. If it is a task it will yield it,
+      # clear the buffer and parsing can continue.
+      for task, thought in self.ingest_token(token=text, buffer=texts, thought=thought):
         yield task
-    # Final possible task
+
+    # If parsing is complete, either there was just one task or this is the last task.
+    # This then processes the last and/or single task in the buffer(texts is the buffer).
     if texts:
       task, _ = self._parse_task("".join(texts), thought)
       # Example:
@@ -194,9 +205,17 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     buffer: List[str],
     thought: Optional[str]
   ) -> Iterator[Tuple[Optional[Task], str]]:
+    '''Appends token to buffer. Checks if the token is a newline. This indicates that
+    the plan had multiple steps and there is one on each line. When there is a newline
+    it will check if the current buffer is a task and if it is it will yield the task
+    and clear the buffer to remove it and parsing can continue.
     '''
-    '''
+
     buffer.append(token)
+
+    # If there's a newline, check if the buffer holds a task, meaning there might be
+    # multiple tasks, one on each line. We can yield the task and clear it from the
+    # buffer and return to allow parsing to continue.
     if "\n" in token:
       buffer_ = "".join(buffer).split("\n")
       suffix = buffer_[-1]
@@ -208,7 +227,7 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
       buffer.append(suffix)
 
   def _parse_task(self, line: str, thought: Optional[str] = None):
-    """This function is used to parse streamed tokens. If what is passed in is not
+    '''This function is used to parse streamed tokens. If what is passed in is not
     complete then it is ignored and simply returned. If it is complete, then we
     check if the streamed tokens were a thought or an action.
     - If Thought: We set the 'thought' variable and keep task as None. Task can be
@@ -220,15 +239,19 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     
     Example line:
     - '0. tavily_search_results_json(query="GDP of New York")'
-    """
+    '''
+
     task = None
+
     if match := re.match(THOUGHT_PATTERN, line):
       # Optionally, action can be preceded by a thought
       thought = match.group(1)
+
     elif match := re.match(ACTION_PATTERN, line):
       # if action is parsed, return the task, and clear the buffer
       idx, tool_name, args, _ = match.groups()
       idx = int(idx)
+
       task = instantiate_task(
         tools=self.tools,
         idx=idx,
@@ -236,6 +259,8 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
         args=args,
         thought=thought,
       )
+
       thought = None
+
     # Else it is just dropped
     return task, thought
