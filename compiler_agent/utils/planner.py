@@ -82,15 +82,17 @@ def create_planner(
     return {"messages": state}
 
   def wrap_and_get_last_index(state: list):
-    next_task = 0
+    next_task_index = 0
     # Look for the last (or you could say most recent) tool result (FunctionMessages
-    # are results from function calls that are passed back) and get the index. This gives us the index of the last function called. We can then add 1 to set for the next task we will be creating
+    # are results from function calls that are passed back) and get the index. This
+    # gives us the index of the last function called. We can then add 1 to set for the
+    # next task we will be creating
     # Note: state[::-1] means start at the end of the sequence and step backwards
     # until you reach the start. This effectively reverses the sequence.
     for message in state[::-1]:
       if isinstance(message, FunctionMessage):
         # +1 because we want the next task to start after the last run function.
-        next_task = message.additional_kwargs["idx"] + 1
+        next_task_index = message.additional_kwargs["idx"] + 1
         break
     # Example to illustrate
     '''
@@ -106,7 +108,7 @@ def create_planner(
       value for NY. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP
       figure.')
 
-    In this case, there was only one FunctionMessage so it has an idx of 0, so next_task will be set as 1.
+    In this case, there was only one FunctionMessage so it has an idx of 0, so next_task_index will be set as 1.
     '''
 
     '''
@@ -117,7 +119,7 @@ def create_planner(
     value for NY. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP
     figure. - Begin counting at : 1')
     '''
-    state[-1].content = state[-1].content + f" - Begin counting at : {next_task}"
+    state[-1].content = state[-1].content + f" - Begin counting at : {next_task_index}"
     return {"messages": state}
 
   return (

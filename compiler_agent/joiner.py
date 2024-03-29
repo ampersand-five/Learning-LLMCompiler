@@ -107,6 +107,11 @@ def _parse_joiner_output(decision: JoinOutputs) -> List[BaseMessage]:
 
 
 def select_recent_messages(messages: list) -> dict:
+  '''This function returns all messages up to the most recent human input. So if there's
+  a bunch of system and ai messages, they're all included till we hit the most recent
+  human message, then we cutoff. So if there's a back and forth with the human this will
+  only keep system/ai messages since then.
+  '''
   selected = []
   # Reverse the list
   for msg in messages[::-1]:
