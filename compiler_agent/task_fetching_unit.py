@@ -193,6 +193,15 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
 @as_runnable
 def plan_and_schedule(messages: List[BaseMessage], config):
 
+  # Planner is a LangChain Runnable, in this case a chain that plans and returns tasks:
+  # return (
+  #   RunnableBranch(
+  #     (should_replan, wrap_and_get_last_index | replanner_prompt),
+  #     wrap_messages | planner_prompt,
+  #   )
+  #   | llm
+  #   | LLMCompilerPlanParser(tools=tools)
+  # )
   # Planner returns a generator of tasks, meaning it's a lazy iterator. We will call
   # next() on it to kickstart the first task.
   tasks = planner.stream(messages, config)
