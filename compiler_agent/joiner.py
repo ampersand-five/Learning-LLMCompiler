@@ -1,9 +1,9 @@
 from typing import Any, Union, List
 
 from langchain_core.messages import (
-    BaseMessage,
-    HumanMessage,
-    SystemMessage
+  BaseMessage,
+  HumanMessage,
+  SystemMessage
 )
 
 from langchain import hub
@@ -14,29 +14,30 @@ from langchain_core.messages import AIMessage
 
 
 class FinalResponse(BaseModel):
-    """The final response/answer."""
+  """The final response/answer."""
 
-    response: str
+  response: str
 
 
 class Replan(BaseModel):
-    feedback: str = Field(
-        description="Analysis of the previous attempts and recommendations on what needs to be fixed."
-    )
+  feedback: str = Field(
+    description="Analysis of the previous attempts and recommendations on what needs to be fixed."
+  )
 
 
 class JoinOutputs(BaseModel):
-    """Decide whether to replan or whether you can return the final response."""
+  """Decide whether to replan or whether you can return the final response."""
 
-    thought: str = Field(
-        description="The chain of thought reasoning for the selected action"
-    )
-    action: Union[FinalResponse, Replan]
+  thought: str = Field(
+    description="The chain of thought reasoning for the selected action"
+  )
+  action: Union[FinalResponse, Replan]
 
 
 joiner_prompt = hub.pull("wfh/llm-compiler-joiner").partial(
-    examples=""
-)  # You can optionally add examples
+  examples=""
+) # You can optionally add examples
+
 ''' Joiner Prompt:
 - input_variables: examples, messages
 
@@ -78,26 +79,26 @@ llm = ChatOpenAI(model="gpt-4-turbo-preview")
 runnable = create_structured_output_runnable(JoinOutputs, llm, joiner_prompt)
 
 def _parse_joiner_output(decision: JoinOutputs) -> List[BaseMessage]:
-    response = [AIMessage(content=f"Thought: {decision.thought}")]
-    if isinstance(decision.action, Replan):
-        return response + [
-            SystemMessage(
-                content=f"Context from last attempt: {decision.action.feedback}"
-            )
-        ]
-    else:
-        return response + [AIMessage(content=decision.action.response)]
+  response = [AIMessage(content=f"Thought: {decision.thought}")]
+  if isinstance(decision.action, Replan):
+    return response + [
+      SystemMessage(
+        content=f"Context from last attempt: {decision.action.feedback}"
+      )
+    ]
+  else:
+    return response + [AIMessage(content=decision.action.response)]
 
 
 def select_recent_messages(messages: list) -> dict:
-    selected = []
-    # Reverse the list
-    for msg in messages[::-1]:
-        selected.append(msg)
-        if isinstance(msg, HumanMessage):
-            break
-    # Return reversed list
-    return {"messages": selected[::-1]}
+  selected = []
+  # Reverse the list
+  for msg in messages[::-1]:
+    selected.append(msg)
+    if isinstance(msg, HumanMessage):
+      break
+  # Return reversed list
+  return {"messages": selected[::-1]}
 
 
 joiner = select_recent_messages | runnable | _parse_joiner_output
