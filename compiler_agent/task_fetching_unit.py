@@ -171,7 +171,7 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
       else:
         # No deps or all deps satisfied
         # can schedule now
-        schedule_task.invoke(dict(task=task, observations=observations))
+        schedule_task.invoke(input=dict(task=task, observations=observations))
 
     # All tasks have been submitted or enqueued
     # Wait for them to complete
@@ -184,7 +184,7 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
   }
 
   tool_messages = [
-    FunctionMessage(name=name, content=str(obs), additional_kwargs={"idx": k})
+    FunctionMessage(name=name, content=str(obs), additional_kwargs={'idx': k, 'args':task['args']})
     for k, (name, obs) in new_observations.items()
   ]
 
