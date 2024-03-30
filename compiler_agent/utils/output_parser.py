@@ -97,8 +97,10 @@ def _get_dependencies_from_graph(
   # If the tool is 'join', that's a special case. It's an internal tool that was not one
   # of the ones in the tools.py file or passed in the tools argument to the planner.
   if tool_name == "join":
+    # depends on the previous step
     return list(range(1, idx))
 
+  # define dependencies based on the dependency rule in default_dependency_rule
   return [i for i in range(1, idx) if default_dependency_rule(i, str(args))]
 
 
@@ -153,6 +155,14 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
   tools: List[BaseTool]
 
   def _transform(self, input: Iterator[Union[str, BaseMessage]]) -> Iterator[Task]:
+    '''processes a task list in the following form:
+    1. tool_1(arg1="arg1", arg2=3.5, ...)
+    Thought: I then want to find out Y by using tool_2
+    2. tool_2(arg1="", arg2="${1}")'
+    3. join()<END_OF_PLAN>"
+
+    The "Thought" lines are optional. The ${#} placeholders are variables. These are used to route tool (task) outputs to other tools.
+    '''
     texts = []
     # TODO: Cleanup tuple state tracking here.
     thought = None
