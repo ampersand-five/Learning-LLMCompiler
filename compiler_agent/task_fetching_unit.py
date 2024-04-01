@@ -5,6 +5,7 @@ from typing import (
   List,
   Dict
 )
+import traceback
 import itertools
 from typing_extensions import TypedDict
 import time
@@ -102,10 +103,16 @@ def schedule_task(task_inputs, config):
 
   try:
     observation = _execute_task(task, observations, config)
+    # Set args to the observation so the LLM can see how it tried to use the tool if it
+    # needs to replan.
+    if 'args' in task and len(task['args']) != 0:
+      observation[0]['args'] = task['args']
 
-  except Exception:
-    import traceback
-    observation = traceback.format_exception()  # repr(e) +
+  except Exception as e:
+    # This is an attempt to have the LLM Self correct. If something happens, the
+    # exception message is set as the observation and the LLM can decide what to do with
+    # the error.
+    observation = e
 
   observations[task["idx"]] = observation
 
