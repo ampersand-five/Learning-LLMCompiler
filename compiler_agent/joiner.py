@@ -1,16 +1,18 @@
 from typing import Any, Union, List
-
+import json
 from langchain_core.messages import (
   BaseMessage,
   HumanMessage,
   SystemMessage
 )
 
-from langchain import hub
 from langchain_openai import ChatOpenAI
 from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain.chains.openai_functions import create_structured_output_runnable
 from langchain_core.messages import AIMessage
+from langchain_core.prompts.chat import SystemMessagePromptTemplate
 
 
 class FinalResponse(BaseModel):
@@ -33,48 +35,31 @@ class JoinOutputs(BaseModel):
   )
   action: Union[FinalResponse, Replan]
 
+# Read config file
+with open('compiler_agent/config.json', 'r') as f:
+  config = json.load(f)
 
-joiner_prompt = hub.pull("wfh/llm-compiler-joiner").partial(
-  examples=""
-) # You can optionally add examples
+# Read joiner prompt from local file
+with open('compiler_agent/prompts/joiner_1.txt', 'r') as file:
+  joiner_prompt_1 = file.read()
+with open('compiler_agent/prompts/joiner_2.txt', 'r') as file:
+  joiner_prompt_2 = file.read()
 
-''' Joiner Prompt:
-- input_variables: examples, messages
+# Since this one has input variables, it is set separately
+joiner_prompt_template_2 = SystemMessagePromptTemplate.from_template(template=joiner_prompt_2)
 
-The prompt pulled from the hub creates a is actually a three prompt list (ChatPromptTemplate object):
+joiner_prompt = ChatPromptTemplate.from_messages(
+  [
+    SystemMessage(content=joiner_prompt_1),
+    MessagesPlaceholder(variable_name='messages'),
+    joiner_prompt_template_2
+  ]
+)
 
-1 - System Message:
-  - input_variables: (none)
-  - Template:
-"""Solve a question answering task. Here are some guidelines:
- - In the Assistant Scratchpad, you will be given results of a plan you have executed to answer the user's question.
- - Thought needs to reason about the question based on the Observations in 1-2 sentences.
- - Ignore irrelevant action results.
- - If the required information is present, give a concise but complete and helpful answer to the user's question.
- - If you are unable to give a satisfactory finishing answer, replan to get the required information. Respond in the following format:
+# Optional: set any examples here
+joiner_prompt = joiner_prompt.partial(examples='')
 
-Thought: <reason about the task results and whether you have sufficient information to answer the question>
-Action: <action to take>
-Available actions:
- (1) Finish(the final answer to return to the user): returns the answer and finishes the task.
- (2) Replan(the reasoning and other information that will help you plan again. Can be a line of any length): instructs why we must replan"""
-
-2 - Messages Placeholder:
-  - variable_name=messages
-  - input_variables=messages
-
-3 - System Message:
-  - input_variables: examples
-  - Template:
-"""Using the above previous actions, decide whether to replan or finish. If all the
-required information is present, you may finish. If you have made many attempts to find
-the information without success, admit so and respond with whatever information you have
-gathered so the user can work well with you.
-
-{examples}"""
-'''
-
-llm = ChatOpenAI(model="gpt-4-turbo-preview")
+llm = ChatOpenAI(**config['joiner_llm'])
 
 runnable = create_structured_output_runnable(JoinOutputs, llm, joiner_prompt)
 

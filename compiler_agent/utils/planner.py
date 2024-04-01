@@ -1,16 +1,22 @@
 from typing import Sequence
+import json
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableBranch
 from langchain_core.tools import BaseTool
 from langchain_core.messages import FunctionMessage, SystemMessage
+from langchain_core.prompts.chat import MessagesPlaceholder
+from langchain_core.prompts.chat import SystemMessagePromptTemplate
 
 from utils.output_parser import LLMCompilerPlanParser
-from langchain import hub
 from langchain_openai import ChatOpenAI
 from utils.tools import tools
 
+
+# Read config file
+with open('compiler_agent/config.json', 'r') as f:
+  config = json.load(f)
 
 def create_planner(
   llm: BaseChatModel,
@@ -33,46 +39,44 @@ def create_planner(
     tool_descriptions=tool_descriptions,
   )
 
+  # Read joiner prompt from local file
+  with open('compiler_agent/prompts/replan.txt', 'r') as file:
+    replan_prompt = file.read()
+
   # Create the replanner prompt that has the replan instructions inserted
   # Take the base prompt and add the number of tools and their descriptions and the replan instructions
   replanner_prompt = base_prompt.partial(
-    replan=" - You are given \"Previous Plan\" which is the plan that the previous agent created along with the execution results "
-    "(given as Observation) of each plan and a general thought (given as Thought) about the executed results. "
-    "You MUST use this information to create the next plan under \"Current Plan\".\n"
-    " - When starting the Current Plan, you should start with \"Thought\" that outlines the strategy for the next plan.\n"
-    " - In the Current Plan, you should NEVER repeat the actions that are already executed in the Previous Plan.\n"
-    " - You must continue the task index from the end of the previous one. Do not repeat task indices.",
-    num_tools=len(tools),
+    replan=replan_prompt,
     tool_descriptions=tool_descriptions,
   )
 
   def should_replan(state: list):
     '''
-  Determine if the planner should replan - checks if the last message is a SystemMessage
-  object. This means that the agent tried to answer the question but ended up with
-  no results and has context from the last attempt in a SystemMessage for how to
-  proceed.
+    Determine if the planner should replan - checks if the last message is a SystemMessage
+    object. This means that the agent tried to answer the question but ended up with
+    no results and has context from the last attempt in a SystemMessage for how to
+    proceed.
 
-  Example 1) On first pass, normal planning, not replanning:
-  State:
-  - HumanMessage(content="What's the GDP of New York?")
+    Example 1) On first pass, normal planning, not replanning:
+    State:
+    - HumanMessage(content="What's the GDP of New York?")
 
-  Example 2) On second pass after the first attempt didn't provide the answer, replan:
-  State:
-  - HumanMessage(content="What's the GDP of New York?")
-  - FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
-  - AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
-  - SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure.\n- The index for the next task or tasks you create is: 1')
-  - AIMessage(content="Thought: The search result provides a link to a potentially relevant source but does not directly answer the user's question with a specific GDP value for New York. To provide a direct answer, more specific data or a summary of the content from the provided URL is required.")
-  - SystemMessage(content="Context from last attempt: To answer the user's question, we need the specific GDP value for New York, NY (MSA). A direct extraction of this value from the provided URL or a summary of its content would be necessary. The current result only indicates the availability of such data without specifying it.")
+    Example 2) On second pass after the first attempt didn't provide the answer, replan:
+    State:
+    - HumanMessage(content="What's the GDP of New York?")
+    - FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
+    - AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
+    - SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure.\n- The index for the next task or tasks you create is: 1')
+    - AIMessage(content="Thought: The search result provides a link to a potentially relevant source but does not directly answer the user's question with a specific GDP value for New York. To provide a direct answer, more specific data or a summary of the content from the provided URL is required.")
+    - SystemMessage(content="Context from last attempt: To answer the user's question, we need the specific GDP value for New York, NY (MSA). A direct extraction of this value from the provided URL or a summary of its content would be necessary. The current result only indicates the availability of such data without specifying it.")
 
-  Example 3) Have final answer, finish:
-  State:
-  - HumanMessage(content="What's the GDP of New York?")
-  - FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
-  - AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
-  - SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure.\n- The index for the next task or tasks you create is: 1')
-  - AIMessage(content="I was unable to find the specific Gross Domestic Product (GDP) figure for New York. You might want to check the latest statistics on reputable economic or governmental websites for the most current information.")
+    Example 3) Have final answer, finish:
+    State:
+    - HumanMessage(content="What's the GDP of New York?")
+    - FunctionMessage(content="[{'url': 'https://fed.newyorkfed.org/series/RGMP4', 'content': 'Graph and download economic data for Total Real Gross Domestic Product for New York, NY (MSA) (RGMP4) from 2017 to 2022 about New York, NY,\\xa0...'}]", additional_kwargs={'idx': 0}, name='tavily_search_results_json')
+    - AIMessage(content="Thought: The search result provides a URL to a page on the New York Federal Reserve's website that likely contains the information on New York GDP from 2017 to 2022, but the actual GDP value is not provided in the snippet. Without the specific GDP value, the user's question cannot be directly answered.")
+    - SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP value for New York. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP figure.\n- The index for the next task or tasks you create is: 1')
+    - AIMessage(content="I was unable to find the specific Gross Domestic Product (GDP) figure for New York. You might want to check the latest statistics on reputable economic or governmental websites for the most current information.")
     '''
     # Context is passed as a system message
     return isinstance(state[-1], SystemMessage)
@@ -146,51 +150,27 @@ def create_planner(
   )
 
 
+# Read planner prompt from local file
+with open('compiler_agent/prompts/planner_1.txt', 'r') as file:
+  planner_prompt_1 = file.read()
+with open('compiler_agent/prompts/planner_2.txt', 'r') as file:
+  planner_prompt_2 = file.read()
+
+# Since this one has input variables, it is set separately
+planner_prompt_template_1 = SystemMessagePromptTemplate.from_template(template=planner_prompt_1)
+
+planner_prompt = ChatPromptTemplate.from_messages(
+  [
+    planner_prompt_template_1,
+    MessagesPlaceholder(variable_name='messages'),
+    SystemMessage(content=planner_prompt_2)
+  ]
+)
 # Example
-llm = ChatOpenAI(model="gpt-4-turbo-preview")
-
-prompt = hub.pull("wfh/llm-compiler")
-'''
-The prompt pulled from the hub creates a is actually a three prompt list (ChatPromptTemplate object):
-
-1 - System Message:
-
-  - input_variables: num_tools, tool_descriptions
-  - Template:
-"""Given a user query, create a plan to solve it with the utmost parallelizability. Each plan should comprise an action from the following {num_tools} types:
-{tool_descriptions}
-{num_tools}. join(): Collects and combines results from prior actions.
-
-- An LLM agent is called upon invoking join() to either finalize the user query or wait until the plans are executed.
-- join should always be the last action in the plan, and will be called in two scenarios:
-  (a) if the answer can be determined by gathering the outputs from tasks to generate the final response.
-  (b) if the answer cannot be determined in the planning phase before you execute the plans. Guidelines:
-- Each action described above contains input/output types and description.
-  - You must strictly adhere to the input and output types for each action.
-  - The action descriptions contain the guidelines. You MUST strictly follow those guidelines when you use the actions.
-- Each action in the plan should strictly be one of the above types. Follow the Python conventions for each action.
-- Each action MUST have a unique ID, which is strictly increasing.
-- Inputs for actions can either be constants or outputs from preceding actions. In the latter case, use the format $id to denote the ID of the previous action whose output will be the input.
-- Always call join as the last action in the plan. Say '<END_OF_PLAN>' after you call join
-- Ensure the plan maximizes parallelizability.
-- Only use the provided action types. If a query cannot be addressed using these, invoke the join action for the next steps.
-- Never introduce new actions other than the ones provided."""
-
-2 - Messages Placeholder:
-  - variable_name=messages
-  - input_variables=messages
-
-3 - System Message:
-  - input_variables: (none)
-  - Template:
-"""Remember, ONLY respond with the task list in the correct format! E.g.:
-idx. tool(arg_name=args)"""
-'''
-
-print('Planner prompt (ChatPromptTemplate object):\n', prompt, '\n')
+llm = ChatOpenAI(**config['planner_llm'])
 
 # This is the primary "agent" in our application
-planner = create_planner(llm, tools, prompt)
+planner = create_planner(llm, tools, planner_prompt)
 
 
 # Example usage

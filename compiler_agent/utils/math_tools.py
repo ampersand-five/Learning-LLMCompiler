@@ -13,14 +13,14 @@ from langchain_core.tools import StructuredTool
 
 
 _MATH_DESCRIPTION = (
-  "math(problem: str, context: Optional[list[str]]) -> float:\n"
+  "math(problem: str, context: Optional[list[str]]) -> float\n"
   " - Solves the provided math problem.\n"
   ' - `problem` can be either a simple math problem (e.g. "1 + 3") or a word problem (e.g. "how many apples are there if there are 3 apples and 2 apples").\n'
   " - You cannot calculate multiple expressions in one call. For instance, `math('1 + 3, 2 + 4')` does not work. "
   "If you need to calculate multiple expressions, you need to call them separately like `math('1 + 3')` and then `math('2 + 4')`\n"
   " - Minimize the number of `math` actions as much as possible. For instance, instead of calling "
-  '2. math("what is the 10% of $1") and then call 3. math("$1 + $2"), '
-  'you MUST call 2. math("what is the 110% of $1") instead, which will reduce the number of math actions.\n'
+  '2. math("what is 10% of $1") and then 3. math("$1 + $2"), '
+  'you MUST call 2. math("what is 110% of $1") instead, which will reduce the number of math actions.\n'
   # Context specific rules below
   " - You can optionally provide a list of strings as `context` to help the agent solve the problem. "
   "If there are multiple contexts you need to answer the question, you can provide them as a list of strings.\n"

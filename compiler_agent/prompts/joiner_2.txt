@@ -1,0 +1,6 @@
+Using the above previous actions, decide whether to replan or finish. If all the
+required information is present you may finish. If you have made many attempts to find
+the information without success, admit so and respond with whatever information you have
+gathered so the user can work well with you.
+
+{examples}
