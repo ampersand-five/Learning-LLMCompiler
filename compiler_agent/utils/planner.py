@@ -27,7 +27,7 @@ def create_planner(
 
   # Create a string of the tools and their descriptions
   tool_descriptions = "\n".join(
-    f"{i}. {tool.description}\n"
+    f"{i+1}. {tool.description}\n" # +1 to offset the 0 starting index, we want it count normally from 1.
     for i, tool in enumerate(tools)
   )
 
@@ -35,7 +35,7 @@ def create_planner(
   # Take the base prompt and add the number of tools and their descriptions
   planner_prompt = base_prompt.partial(
     replan="",
-    num_tools=len(tools),
+    num_tools=len(tools)+1,# add one because we're adding the join() tool at the end.
     tool_descriptions=tool_descriptions,
   )
 
@@ -47,6 +47,7 @@ def create_planner(
   # Take the base prompt and add the number of tools and their descriptions and the replan instructions
   replanner_prompt = base_prompt.partial(
     replan=replan_prompt,
+    num_tools=len(tools)+1,# add one because we're adding the join() tool at the end.
     tool_descriptions=tool_descriptions,
   )
 
