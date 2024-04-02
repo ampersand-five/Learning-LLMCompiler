@@ -39,7 +39,7 @@ Example plans:
 
 - Example Plan:
 User query: "How much does Microsoft's market cap need to increase to exceed Apple's market cap?"
-1. search(query="Microsoft market cap")
-2. search(query="Apple market cap")
+1. tavily_search_results_json(query="Microsoft market cap")
+2. tavily_search_results_json(query="Apple market cap")
 3. math(problem="${{1}}/${{2}}")
 4. join()<END_OFPLAN>
