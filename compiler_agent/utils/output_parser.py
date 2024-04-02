@@ -157,11 +157,10 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
   def _transform(self, input: Iterator[Union[str, BaseMessage]]) -> Iterator[Task]:
     '''processes a task list in the following form:
     1. tool_1(arg1="arg1", arg2=3.5, ...)
-    Thought: I then want to find out Y by using tool_2
     2. tool_2(arg1="", arg2="${1}")'
     3. join()<END_OF_PLAN>"
 
-    The "Thought" lines are optional. The ${#} placeholders are variables. These are used to route tool (task) outputs to other tools.
+    The ${#} placeholders are variables. These are used to route tool (task) outputs to other tools.
     '''
     texts = []
     # TODO: Cleanup tuple state tracking here.
