@@ -72,7 +72,7 @@ def default_dependency_rule(idx, args: str) -> bool:
   '''Checks to see if the given index is listed as a dependency in the args string.
 
   Uses regex to find all instances of the ID_PATTERN in the args string. This pulls out
-  numbers taht are formatted to show dependencies.
+  numbers that are formatted to show dependencies.
   Example regex matching: $1 or ${1} -> 1
 
   Then, for all matches it finds, it checks if the index (idx) passed in is in the list.

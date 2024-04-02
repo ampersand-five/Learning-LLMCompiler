@@ -39,6 +39,8 @@ def _execute_task(task, observations, config):
 
   tool_to_use = task["tool"]
 
+  # This is for the join() function. Just return and it will set the results as 'join'
+  # and the agent will follow up by replanning.
   if isinstance(tool_to_use, str):
     return tool_to_use
 
@@ -55,8 +57,11 @@ def _execute_task(task, observations, config):
       }
 
     else:
-      # If we reach here, the args have not resolved correctly but also didn't throw an exception. This is an attempt to assign them anyway for the tool being called and see if it works. Since each tool is different, it might work, but will likely fail.
-      resolved_args = args
+      # If we reach here, the args have not resolved correctly but also didn't throw an
+      # uncaught exception. We could just assign the args and pass them to the tool, but
+      # that will likely cause unexpected hard to catch bugs or silent errors. So
+      # instead we will raise it as an error to be safe.
+      raise ValueError
 
   except Exception as e:
     return (
@@ -76,10 +81,16 @@ def _execute_task(task, observations, config):
 
 
 def _resolve_arg(arg: Union[str, Any], observations: Dict[int, Any]):
+  '''Resolve arguments. This is mostly to get and replace ${idx} arguments that are
+  dependencies on other tasks. Otherwise we just return the arguments again.
+  '''
 
+  # For dependencies on other tasks
   if isinstance(arg, str) and arg.startswith("$"):
 
     try:
+      # Attempt to parse if it is just '${idx}', this doesn't work on strings like
+      # '${1}+${2}'
       stripped = arg[1:].replace(".output", "").strip("{}")
       idx = int(stripped)
 
@@ -179,10 +190,15 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
       args_for_tasks[task["idx"]] = (task["args"])
 
       if (
-        # Depends on other tasks
+        # Check if dependencies and if any of them are not yet completed (completed
+        # ones show up in the observations list)
         deps
+        # any([dep not in observations for dep in deps]) evaluates to True if at least
+        # one element in deps is not present in observations, and False otherwise.
         and (any([dep not in observations for dep in deps]))
       ):
+        # One or more tasks that this task depends on is not yet finished. So we shedule
+        # it to wait.
         futures.append(
           executor.submit(
             schedule_pending_task, task, observations, retry_after
