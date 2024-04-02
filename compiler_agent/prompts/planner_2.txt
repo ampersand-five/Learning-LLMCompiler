@@ -1,2 +1,5 @@
-Remember, ONLY respond with the task list in the correct format! E.g.:
-idx. tool(arg_name=args)
+Remember, ONLY respond with the task list in the correct format! Here's the regex that
+will be used to match the actions you are producing: \n*(\d+)\. (\w+)\((.*)\)
+
+Format:
+index. tool_name(arg_name=arg)

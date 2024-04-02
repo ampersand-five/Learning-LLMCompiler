@@ -123,9 +123,18 @@ def create_planner(
     - SystemMessage(content='Context from last attempt: The information provided does not include the specific GDP
     value for NY. A different source or a direct visit to the provided URL might be necessary to obtain the exact GDP
     figure.
-    - The index for the next task or tasks you create is: 1')
+    - From the previous attempt information, thought and context, create a new plan to solve
+      the user's query with the utmost parallelizability.
+    - You must continue the task index from the end of the previous one. Do not repeat task
+      indices.
+    - The index to continue from in your new action plan is: 3')
     '''
-    state[-1].content = state[-1].content + f"\n- The index for the next task or tasks you create is: {next_task_index}"
+    state[-1].content = state[-1].content + f'''
+- From the previous attempt information, thought and context, create a new plan to solve
+  the user's query with the utmost parallelizability.
+- You must continue the task index from the end of the previous one. Do not repeat task
+  indices.
+- The index to continue from in your new action plan is: {next_task_index}'''
     return {"messages": state}
 
   return (

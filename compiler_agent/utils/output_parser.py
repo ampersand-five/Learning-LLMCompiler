@@ -165,6 +165,14 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     '''
     texts = []
     # TODO: Cleanup tuple state tracking here.
+    # The above is a note from the original walkthrough, I do not know what they were
+    # getting at exactly, but I might have an idea:
+    # 1) The parse_task() function doesn't really handle when tasks are malformatted.
+    #   It will return a None and that gums up the agent a bit and it flails a little
+    #   (read: loops plan/join) and eventually the LLM gives a good task and it
+    #   continues on.
+    # 2) I have noticed that the parse_task() function returns a tuple: (task, thought)
+    #   but thought is always discarded and not used.
     thought = None
     for chunk in input:
       # Assume input is str. TODO: support vision/other formats
@@ -206,7 +214,8 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     config: RunnableConfig | None = None,
     **kwargs: Any | None,
   ) -> Iterator[Task]:
-    ''''''
+    '''This takes streamed tokens from the 'planner' Runnable llm output that is
+    will only hit this when '''
     yield from self.transform([input], config, **kwargs)
 
   def ingest_token(
@@ -248,8 +257,24 @@ class LLMCompilerPlanParser(BaseTransformOutputParser[dict], extra="allow"):
     - If Neither (Incomplete): We return task=None, thought=thought (thought stays as
       it was when passed in as an argument to this function).
     
-    Example line:
+    Action example line:
     - '0. tavily_search_results_json(query="GDP of New York")'
+
+    Action pattern examples: 
+    - 2. join()
+      - Good.
+    - 2. join() <END_OF_PLAN>
+      - Good.
+    - 2. join() # call join to get results back
+      - Good. Might have a comment, that's ok we capture it and throw it away.
+    - join
+      - Bad. Missing index and function parenthesis.
+    - join()
+      - Bad. Missing index.
+      
+      When bad patterns come through, they should fall through both thought and action
+      regex patterns and a 'None' will be returned and None is not to be added to a
+      task list.
     '''
 
     task = None
