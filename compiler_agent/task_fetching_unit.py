@@ -55,7 +55,7 @@ def _execute_task(task, observations, config):
       }
 
     else:
-      # This will likely fail
+      # If we reach here, the args have not resolved correctly but also didn't throw an exception. This is an attempt to assign them anyway for the tool being called and see if it works. Since each tool is different, it might work, but will likely fail.
       resolved_args = args
 
   except Exception as e:
@@ -96,17 +96,23 @@ def _resolve_arg(arg: Union[str, Any], observations: Dict[int, Any]):
 
 
 @as_runnable
-def schedule_task(task_inputs, config):
+def schedule_task(task_inputs, config) -> None:
+  '''Schedule and run the task and update with results.
+
+  task_inputs is a dictionary and a mutable object in python, so it is being passed by
+  reference; this function will modify the object directly through the reference. So the
+  caller function will see results in the same object it passed in and this function
+  thus won't return any values.
+
+  The passed in observations will have a new entry inserted using the index of the task
+  as the key and the results of running the task as the value.
+  '''
 
   task: Task = task_inputs["task"]
   observations: Dict[int, Any] = task_inputs["observations"]
 
   try:
     observation = _execute_task(task, observations, config)
-    # Set args to the observation so the LLM can see how it tried to use the tool if it
-    # needs to replan.
-    if 'args' in task and len(task['args']) != 0:
-      observation[0]['args'] = task['args']
 
   except Exception as e:
     # This is an attempt to have the LLM Self correct. If something happens, the
@@ -114,6 +120,7 @@ def schedule_task(task_inputs, config):
     # the error.
     observation = e
 
+  # Mutable parameter passed by reference, so we don't need to return anything.
   observations[task["idx"]] = observation
 
 
@@ -151,18 +158,25 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
   # plans. Start with those.
   observations = _get_observations(messages)
   task_names = {}
+  args_for_tasks = {}
   originals = set(observations)
-  # ^^ We assume each task inserts a different key above to
-  # avoid race conditions...
+  # ^^ We assume each task inserts a different key above to avoid race conditions.
+
+  # List for tasks that have dependencies on other steps, they'll be scheduled tasks.
   futures = []
   retry_after = 0.25  # Retry every quarter second
 
   with ThreadPoolExecutor() as executor:
     for task in tasks:
+      # Grab dependencies
       deps = task["dependencies"]
+      # Grab task names and args because outside the thread pool executor, we lose each
+      # task except the last one to finish. Grabbing here, let's us keep this info after
+      # they all complete.
       task_names[task["idx"]] = (
         task["tool"] if isinstance(task["tool"], str) else task["tool"].name
       )
+      args_for_tasks[task["idx"]] = (task["args"])
 
       if (
         # Depends on other tasks
@@ -176,23 +190,21 @@ def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
         )
 
       else:
-        # No deps or all deps satisfied
-        # can schedule now
-        schedule_task.invoke(input=dict(task=task, observations=observations))
+        # No deps or all deps satisfied, can schedule now.
+        schedule_task.invoke(input={"task": task, "observations": observations})
 
-    # All tasks have been submitted or enqueued
-    # Wait for them to complete
+    # All tasks have been submitted or enqueued. Wait for them to complete.
     wait(futures)
 
   # Convert observations to new tool messages to add to the state
   new_observations = {
-    k: (task_names[k], observations[k])
+    k: (task_names[k], args_for_tasks[k], observations[k])
     for k in sorted(observations.keys() - originals)
   }
 
   tool_messages = [
-    FunctionMessage(name=name, content=str(obs), additional_kwargs={'idx': k, 'args':task['args']})
-    for k, (name, obs) in new_observations.items()
+    FunctionMessage(name=task_name, content=str(observation), additional_kwargs={'idx': k, 'args':task_args})
+    for k, (task_name, task_args, observation) in new_observations.items()
   ]
 
   return tool_messages
