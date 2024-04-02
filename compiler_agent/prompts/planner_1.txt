@@ -28,8 +28,7 @@ Guidelines:
 - Always call join as the last action in the plan. Say '<END_OF_PLAN>' after you call
   join().
 - Ensure the plan maximizes parallelizability.
-- Only use the provided action types. If a query cannot be addressed using these, invoke
-  the join action for the next steps.
+- Only use the provided action types.
 - Never introduce new actions other than the ones provided.
 
 Example plans:
