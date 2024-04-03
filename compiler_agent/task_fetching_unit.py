@@ -5,6 +5,7 @@ from typing import (
   List,
   Dict
 )
+import re
 import traceback
 import itertools
 from typing_extensions import TypedDict
@@ -16,6 +17,10 @@ from langchain_core.runnables import chain as as_runnable
 
 from utils.output_parser import Task
 from utils.planner import planner
+
+# $1 or ${1} -> 1
+ID_PATTERN = r"\$\{?(\d+)\}?"
+
 
 def _get_observations(messages: List[BaseMessage]) -> Dict[int, Any]:
   # Get all previous tool responses
@@ -57,10 +62,10 @@ def _execute_task(task, observations, config):
       }
 
     else:
-      # If we reach here, the args have not resolved correctly but also didn't throw an
-      # uncaught exception. We could just assign the args and pass them to the tool, but
-      # that will likely cause unexpected hard to catch bugs or silent errors. So
-      # instead we will raise it as an error to be safe.
+      # If it reaches here, the args have not resolved correctly but also didn't throw
+      # an uncaught exception. It could just assign the args and pass them to the tool,
+      # but that will likely cause unexpected, hard to catch bugs or silent errors. So
+      # instead it will raise here as an error to be safe.
       raise ValueError
 
   except Exception as e:
@@ -85,19 +90,23 @@ def _resolve_arg(arg: Union[str, Any], observations: Dict[int, Any]):
   dependencies on other tasks. Otherwise we just return the arguments again.
   '''
 
+  def replace_match(match):
+    # If the string is ${123}, match.group(0) is ${123}, and match.group(1) is 123.
+
+    # Return the match group, in this case the index, from the string. This is the index
+    # number we get back.
+    idx = int(match.group(1))
+    # This expression retrieves the value associated with the index idx from the
+    # observations dictionary. If the index is not found in the dictionary, it returns
+    # the placeholder itself (match.group(0)).
+    return str(observations.get(idx, match.group(0)))
+
   # For dependencies on other tasks
-  if isinstance(arg, str) and arg.startswith("$"):
-
-    try:
-      # Attempt to parse if it is just '${idx}', this doesn't work on strings like
-      # '${1}+${2}'
-      stripped = arg[1:].replace(".output", "").strip("{}")
-      idx = int(stripped)
-
-    except Exception:
-      return str(arg)
-
-    return str(observations[idx])
+  if isinstance(arg, str):
+    # re.sub() searches the whole string and replaces all occurrences where the pattern
+    # is matched. For each match, it calls the function and uses the match as input,
+    # then replaces the match with the returned value from the function.
+    return re.sub(ID_PATTERN, replace_match, arg)
 
   elif isinstance(arg, list):
     return [_resolve_arg(a, observations) for a in arg]
