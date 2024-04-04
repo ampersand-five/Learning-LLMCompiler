@@ -145,7 +145,7 @@ def instantiate_task(
     tool=tool,
     args=tool_args,
     dependencies=dependencies,
-    thought=thought,
+    thought=thought
   )
 
 

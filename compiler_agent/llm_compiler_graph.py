@@ -83,30 +83,90 @@ for step in chain.stream(
 ):
   print(step)
   print("---")
-
 # Final answer
 print(step[END][-1].content)
 
 
-# # *** Example 2 - Multi-Hop Question
-# steps = chain.stream(
-#   [HumanMessage(content="What's the oldest parrot alive, and how much longer is that than the average?")],
-#   {"recursion_limit": 100}
-# )
-# for step in steps:
-#   print(step)
-#   print("---")
+# *** Example 2 - Multi-Hop Question
+steps = chain.stream(
+  [HumanMessage(content="What's the oldest parrot alive, and how much longer is that than the average?")],
+  {"recursion_limit": 60}
+)
+for step in steps:
+  print(step)
+  print("---")
+# Final answer
+print(step[END][-1].content)
+'''
+This example #2 question highlights an issue with the math function that needs to be
+fixed somehow. Here's the output it wants to generate:
 
-# # Final answer
-# print(step[END][-1].content)
+1. tavily_search_results_json(query="oldest parrot alive")
+2. tavily_search_results_json(query="average lifespan of a parrot")
+3. math(problem="${1} - ${2}", context=["oldest parrot alive", "average lifespan of a parrot"])
+4. join()<END_OF_PLAN>
+
+Step 3 is the problem. It should be like this:
+3. math(problem="oldest parrot alive minus average lifespan of a parrot", context=[${1},${2}])
+
+Couple issues or fixes:
+- The context parameters will fill in with search results, but they don't say what query
+  generated those results, and this might be crucial information.
+- We could have the llm just fill the 'problem' param with everything, the query and
+  the context.
+- We probably need a processing step before the math step, it likely would be part of
+  math function, it would just have a two step process. Which it already has, so maybe
+  just tweak it to handle this case.
+'''
 
 
-# # *** Example 3 - Multi-Step Math Question
-# for step in chain.stream(
-#   [HumanMessage(content="What's ((3*(4+5)/0.5)+3245) + 8? What's 32/4.23? What's the sum of those two values?")]
-# ):
-#   print(step)
-#   print("---")
+### The next two examples will be the inverse of eachother to test and make sure it can
+### correctly do reasoning to answer the question. In one case the answer will follow
+### the question so the answer is straightforward, in the other question the answer will
+### be inverted from the question which will make sure the LLM can correctly see this
+### and give the right answer still. So between these two answers, one should give an
+### amount, but the other should not give an amount, but state that it's already higher.
 
-# # Final answer
-# print(step[END][-1].content)
+# *** Example 3 - Multi-Hop Question
+steps = chain.stream(
+  [HumanMessage(content="How much does Microsoft's market cap need to increase to exceed Apple's market cap?")],
+  {"recursion_limit": 60}
+)
+for step in steps:
+  print(step)
+  print("---")
+# Final answer
+print(step[END][-1].content)
+
+
+# *** Example 4 - Multi-Hop Question
+steps = chain.stream(
+  [HumanMessage(content="How much does Apple's market cap need to increase to exceed Microsoft's market cap?")],
+  {"recursion_limit": 60}
+)
+for step in steps:
+  print(step)
+  print("---")
+# Final answer
+print(step[END][-1].content)
+
+
+# *** Example 5 - Multi-Step Math Question
+for step in chain.stream(
+  [HumanMessage(content="What's ((3*(4+5)/0.5)+3245) + 8? What's 32/4.23? What's the sum of those two values?")]
+):
+  print(step)
+  print("---")
+# Final answer
+print(step[END][-1].content)
+
+
+# *** Example 6 - Conversational test, it should respond simply with a greeting.
+for step in chain.stream(
+  [HumanMessage(content="Hello robot! 🤖")]
+):
+  print(step)
+  print("---")
+
+# Final answer
+print(step[END][-1].content)
