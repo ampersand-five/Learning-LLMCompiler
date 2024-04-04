@@ -7,6 +7,11 @@ I take what's there and follow it. I however pulled the code out into their own 
 structure rather than one long script. I have also copied out the prompts and changed
 them to work better.
 
+Images of flow from the LangGraph tutorial:
+Two visualizations of the same flow:
+![Graph](assets/llm-compiler.png)
+![Alternate Graph](assets/llm-compiler-2.png)
+
 Requires a .env file that has the following:
 ```
 # DO NOT COMMIT TO GIT
